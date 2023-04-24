@@ -1,6 +1,14 @@
 package main
 
-import "flag"
+import (
+	"flag"
+	"log"
+	"net"
+	"strings"
+	"syscall"
+
+	"github.com/JamesYYang/tc-filter/byteorder"
+)
 
 type Flags struct {
 	KernelBTF string
@@ -14,6 +22,20 @@ type Flags struct {
 	FilterPort      uint16
 
 	DropPackage bool
+}
+
+type FilterConfig struct {
+	// Filter l3
+	FilterSrcIP [16]byte
+	FilterDstIP [16]byte
+
+	// Filter l4
+	FilterProto   uint8
+	FilterSrcPort uint16
+	FilterDstPort uint16
+	FilterPort    uint16
+
+	IsDrop byte
 }
 
 func SetFlags() *Flags {
@@ -31,4 +53,51 @@ func SetFlags() *Flags {
 	flag.BoolVar(&f.DropPackage, "drop-skb", false, "drop filtered skb")
 
 	return f
+}
+
+func GetConfig(flags *Flags) FilterConfig {
+	cfg := FilterConfig{}
+
+	if flags.FilterPort > 0 {
+		cfg.FilterPort = byteorder.HostToNetwork16(flags.FilterPort)
+	} else {
+		if flags.FilterSrcPort > 0 {
+			cfg.FilterSrcPort = byteorder.HostToNetwork16(flags.FilterSrcPort)
+		}
+		if flags.FilterDstPort > 0 {
+			cfg.FilterDstPort = byteorder.HostToNetwork16(flags.FilterDstPort)
+		}
+	}
+
+	switch strings.ToLower(flags.FilterProto) {
+	case "tcp":
+		cfg.FilterProto = syscall.IPPROTO_TCP
+	case "udp":
+		cfg.FilterProto = syscall.IPPROTO_UDP
+	case "icmp":
+		cfg.FilterProto = syscall.IPPROTO_ICMP
+	}
+
+	if flags.FilterDstIP != "" {
+		ip := net.ParseIP(flags.FilterDstIP)
+		if ip == nil {
+			log.Fatalf("Failed to parse --filter-dst-ip")
+		}
+		copy(cfg.FilterDstIP[:], ip.To4()[:])
+	}
+
+	if flags.FilterSrcIP != "" {
+		ip := net.ParseIP(flags.FilterSrcIP)
+		if ip == nil {
+			log.Fatalf("Failed to parse --filter-src-ip")
+		}
+		copy(cfg.FilterSrcIP[:], ip.To4()[:])
+
+	}
+
+	if flags.DropPackage {
+		cfg.IsDrop = 1
+	}
+
+	return cfg
 }

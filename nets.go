@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"net"
 )
 
@@ -69,7 +68,6 @@ func (neti *NetInterface) LoadIfInterface() {
 				name:  iface.Name,
 				ip:    ip.String(),
 			}
-			log.Printf("%+v\n", n)
 			neti.interfaces[n.index] = n
 		}
 	}

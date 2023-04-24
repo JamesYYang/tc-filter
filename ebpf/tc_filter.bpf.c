@@ -5,6 +5,20 @@
 #include "helper.h"
 #include "bpf_endian.h"
 
+struct filter_config
+{
+    u32 saddr;
+    u32 daddr;
+    u8 l4_proto;
+    u16 sport;
+    u16 dport;
+    u16 port;
+    u8 is_drop;
+} __attribute__((packed));
+
+static volatile const struct filter_config FCG;
+#define fcg (&FCG)
+
 struct net_packet_event
 {
     u64 ts;
@@ -34,6 +48,26 @@ struct
 // Force emitting struct event into the ELF.
 const struct net_packet_event *unused __attribute__((unused));
 
+static inline int filterL4SKB(struct iphdr *iph)
+{
+    if (fcg->l4_proto && iph->protocol != fcg->l4_proto)
+    {
+        return 0;
+    }
+
+    if (fcg->saddr && iph->saddr != fcg->saddr)
+    {
+        return 0;
+    }
+
+    if (fcg->daddr && iph->daddr != fcg->daddr)
+    {
+        return 0;
+    }
+
+    return 1;
+}
+
 // https://github.com/aquasecurity/tracee/blob/main/pkg/ebpf/c/tracee.bpf.c#L6060
 static inline int capture_packets(struct __sk_buff *skb, u16 is_ingress)
 {
@@ -58,12 +92,10 @@ static inline int capture_packets(struct __sk_buff *skb, u16 is_ingress)
 
     // IP headers
     struct iphdr *iph = (struct iphdr *)(data_start + ETH_HLEN);
-    // filter out non-TCP packets
-    // if (iph->protocol != IPPROTO_TCP)
-    // {
-    //     return TC_ACT_OK;
-    // }
-    //
+    if (!filterL4SKB(iph))
+    {
+        return TC_ACT_OK;
+    }
 
     struct tcphdr *tcp = (struct tcphdr *)(data_start + ETH_HLEN + IP_HLEN);
     if (tcp->source == bpf_htons(22) || tcp->dest == bpf_htons(22))

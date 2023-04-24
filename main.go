@@ -13,6 +13,8 @@ import (
 
 func main() {
 
+	log.SetFlags(log.Ldate | log.Lmicroseconds)
+
 	f := SetFlags()
 	flag.Parse()
 
@@ -28,14 +30,14 @@ func main() {
 
 	uname, _ := GetOSUnamer()
 	unameBytes, _ := json.MarshalIndent(uname, "", "\t")
-	log.Println(string(unameBytes))
+	log.Printf("\n%s\n", string(unameBytes))
 
 	log.Println("tc-filter start...")
 	log.Printf("process pid: %d\n", os.Getpid())
 
 	p := NewTcProbe(neti)
 
-	p.Start()
+	p.Start(f)
 
 	stopper := make(chan os.Signal, 1)
 	signal.Notify(stopper, os.Interrupt, syscall.SIGTERM)

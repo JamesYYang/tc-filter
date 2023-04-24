@@ -40,14 +40,3 @@
 #define UDP_HLEN sizeof(struct udphdr)
 #define DNS_HLEN sizeof(struct dns_hdr)
 #define ctx_ptr(field) (void *)(long)(field)
-
-struct net_tcp_event
-{
-    u32 pid;
-    u16 event;
-    u32 saddr;
-    u32 daddr;
-    u16 sport;
-    u16 dport;
-    u8 comm[16];
-};

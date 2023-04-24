@@ -48,11 +48,24 @@ func NewTcProbe(neti *NetInterface) *TcProbe {
 //customize deleteed TC filter
 //tc filter del dev eth0 ingress(egress)
 
-func (p *TcProbe) Start() {
+func (p *TcProbe) Start(f *Flags) {
 	objs := TCFilterObjects{}
+	var bpfSpec *ebpf.CollectionSpec
 
-	if err := LoadTCFilterObjects(&objs, nil); err != nil {
+	bpfSpec, err := LoadTCFilter()
+	if err != nil {
 		log.Fatalf("loading objects: %v", err)
+	}
+
+	fcg := GetConfig(f)
+	if err := bpfSpec.RewriteConstants(map[string]interface{}{
+		"FCG": fcg,
+	}); err != nil {
+		log.Fatalf("Failed to rewrite filter config: %v", err)
+	}
+
+	if err := bpfSpec.LoadAndAssign(objs, nil); err != nil {
+		log.Fatalf("Failed to load bpf objects: %v", err)
 	}
 	p.bpf = &objs
 
