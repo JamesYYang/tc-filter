@@ -18,7 +18,8 @@ func main() {
 	f := SetFlags()
 	flag.Parse()
 
-	log.Printf("%+v\n", f)
+	fBytes, _ := json.MarshalIndent(f, "", "\t")
+	log.Printf("\n%s\n", string(fBytes))
 
 	neti := NewNetInterface()
 	neti.LoadIfInterface()

@@ -64,7 +64,7 @@ func (p *TcProbe) Start(f *Flags) {
 		log.Fatalf("Failed to rewrite filter config: %v", err)
 	}
 
-	if err := bpfSpec.LoadAndAssign(objs, nil); err != nil {
+	if err := bpfSpec.LoadAndAssign(&objs, nil); err != nil {
 		log.Fatalf("Failed to load bpf objects: %v", err)
 	}
 	p.bpf = &objs

@@ -13,4 +13,4 @@ build:
 	go build -o tc-filter
 
 run:
-	./tc-filter
+	./tc-filter --filter-proto=icmp --drop-skb=true

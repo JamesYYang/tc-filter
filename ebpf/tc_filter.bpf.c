@@ -48,7 +48,7 @@ struct
 // Force emitting struct event into the ELF.
 const struct net_packet_event *unused __attribute__((unused));
 
-static inline int filterL4SKB(struct iphdr *iph)
+static inline int filterL3SKB(struct iphdr *iph)
 {
     if (fcg->l4_proto && iph->protocol != fcg->l4_proto)
     {
@@ -68,7 +68,26 @@ static inline int filterL4SKB(struct iphdr *iph)
     return 1;
 }
 
-// https://github.com/aquasecurity/tracee/blob/main/pkg/ebpf/c/tracee.bpf.c#L6060
+static inline int filterL4SKB(u16 dport, u16 sport)
+{
+    if (fcg->sport && sport != fcg->sport)
+    {
+        return 0;
+    }
+
+    if (fcg->dport && dport != fcg->dport)
+    {
+        return 0;
+    }
+
+    if (fcg->port && (dport != fcg->port && sport != fcg->port))
+    {
+        return 0;
+    }
+
+    return 1;
+}
+
 static inline int capture_packets(struct __sk_buff *skb, u16 is_ingress)
 {
     // packet data
@@ -92,15 +111,42 @@ static inline int capture_packets(struct __sk_buff *skb, u16 is_ingress)
 
     // IP headers
     struct iphdr *iph = (struct iphdr *)(data_start + ETH_HLEN);
-    if (!filterL4SKB(iph))
+    if (!filterL3SKB(iph))
     {
         return TC_ACT_OK;
     }
 
-    struct tcphdr *tcp = (struct tcphdr *)(data_start + ETH_HLEN + IP_HLEN);
-    if (tcp->source == bpf_htons(22) || tcp->dest == bpf_htons(22))
+    u16 l4_proto = iph->protocol;
+
+    u16 sport = 0, dport = 0;
+    u16 f = 0, r = 0, s = 0, a = 0, p = 0;
+
+    if (l4_proto == IPPROTO_TCP)
     {
-        return TC_ACT_OK;
+        // TCP header
+        struct tcphdr *tcp = (struct tcphdr *)(data_start + ETH_HLEN + IP_HLEN);
+        sport = bpf_ntohs(tcp->source);
+        dport = bpf_ntohs(tcp->dest);
+        if (!filterL4SKB(dport, sport))
+        {
+            return TC_ACT_OK;
+        }
+        f = tcp->fin;
+        r = tcp->rst;
+        s = tcp->syn;
+        p = tcp->psh;
+        a = tcp->ack;
+    }
+    else if (l4_proto == IPPROTO_UDP)
+    {
+        // UDP header
+        struct udphdr *udp = (struct udphdr *)(data_start + ETH_HLEN + UDP_HLEN);
+        sport = bpf_ntohs(udp->source);
+        dport = bpf_ntohs(udp->dest);
+        if (!filterL4SKB(dport, sport))
+        {
+            return TC_ACT_OK;
+        }
     }
 
     struct net_packet_event *pkt;
@@ -109,6 +155,7 @@ static inline int capture_packets(struct __sk_buff *skb, u16 is_ingress)
     {
         return TC_ACT_OK;
     }
+
     pkt->ts = bpf_ktime_get_ns();
     pkt->len = skb->len;
     pkt->mark = skb->mark;
@@ -117,15 +164,20 @@ static inline int capture_packets(struct __sk_buff *skb, u16 is_ingress)
     pkt->protocol = iph->protocol;
     pkt->dip = iph->daddr;
     pkt->sip = iph->saddr;
-    pkt->dport = bpf_ntohs(tcp->dest);
-    pkt->sport = bpf_ntohs(tcp->source);
-    pkt->fin = tcp->fin;
-    pkt->rst = tcp->rst;
-    pkt->syn = tcp->syn;
-    pkt->psh = tcp->psh;
-    pkt->ack = tcp->ack;
+    pkt->dport = dport;
+    pkt->sport = sport;
+    pkt->fin = f;
+    pkt->rst = r;
+    pkt->syn = s;
+    pkt->psh = p;
+    pkt->ack = a;
 
     bpf_ringbuf_submit(pkt, 0);
+
+    if (fcg->is_drop)
+    {
+        return TC_ACT_SHOT;
+    }
 
     return TC_ACT_OK;
 }
