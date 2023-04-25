@@ -1,6 +1,34 @@
 # tc-filter
 Linux network filter base on ebpf tc
 
+![](docs/demo.gif)
+
+
+## Usage
+
+```bash
+./tc-filter --help
+
+Usage of ./tc-filter:
+  -drop-skb
+        drop filtered skb
+  -filter-dst-ip string
+        filter destination IP addr
+  -filter-dst-port value
+        filter destination port
+  -filter-if string
+        filter net interface
+  -filter-port value
+        filter either destination or source port
+  -filter-proto string
+        filter L4 protocol (tcp, udp, icmp)
+  -filter-src-ip string
+        filter source IP addr
+  -filter-src-port value
+        filter source port
+  -kernel-btf string
+        specify kernel BTF file
+```
 
 ## how to run
 
