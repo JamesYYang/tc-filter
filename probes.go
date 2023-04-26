@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/cilium/ebpf"
+	"github.com/cilium/ebpf/btf"
 	"github.com/cilium/ebpf/ringbuf"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
@@ -49,10 +50,25 @@ func NewTcProbe(neti *NetInterface) *TcProbe {
 //tc filter del dev eth0 ingress(egress)
 
 func (p *TcProbe) Start(f *Flags) {
+
+	var btfSpec *btf.Spec
+	var err error
+	if f.KernelBTF != "" {
+		btfSpec, err = btf.LoadSpec(f.KernelBTF)
+	} else {
+		btfSpec, err = btf.LoadKernelSpec()
+	}
+	if err != nil {
+		log.Fatalf("Failed to load BTF spec: %s", err)
+	}
+
+	var opts ebpf.CollectionOptions
+	opts.Programs.KernelTypes = btfSpec
+
 	objs := TCFilterObjects{}
 	var bpfSpec *ebpf.CollectionSpec
 
-	bpfSpec, err := LoadTCFilter()
+	bpfSpec, err = LoadTCFilter()
 	if err != nil {
 		log.Fatalf("loading objects: %v", err)
 	}
@@ -64,12 +80,16 @@ func (p *TcProbe) Start(f *Flags) {
 		log.Fatalf("Failed to rewrite filter config: %v", err)
 	}
 
-	if err := bpfSpec.LoadAndAssign(&objs, nil); err != nil {
+	if err := bpfSpec.LoadAndAssign(&objs, &opts); err != nil {
 		log.Fatalf("Failed to load bpf objects: %v", err)
 	}
 	p.bpf = &objs
 
 	for _, tcPro := range p.probes {
+
+		if f.FilterInterface != "" && tcPro.ifName != f.FilterInterface {
+			continue
+		}
 
 		link, err := netlink.LinkByIndex(tcPro.ifIndex)
 		if err != nil {
