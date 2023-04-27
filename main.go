@@ -36,7 +36,8 @@ func main() {
 	log.Println("tc-filter start...")
 	log.Printf("process pid: %d\n", os.Getpid())
 
-	p := NewTcProbe(neti)
+	o := NewOutput(neti)
+	p := NewTcProbe(neti, o)
 
 	p.Start(f)
 

@@ -13,4 +13,4 @@ build:
 	go build -o tc-filter
 
 run:
-	./tc-filter --filter-proto=icmp
+	./tc-filter

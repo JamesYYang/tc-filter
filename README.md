@@ -32,6 +32,8 @@ Usage of ./tc-filter:
 
 ## how to run
 
+`tc-filter` requires >= 5.8 kernel to run.
+
 install bpf2go
 
 ```bash
@@ -57,5 +59,5 @@ make
 
 run program
 ```bash
-sudo make run
+sudo ./tc-filter
 ```
